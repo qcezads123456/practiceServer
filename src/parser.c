@@ -56,8 +56,8 @@ static int parse(int new_socket,HTTP_t *msg){
     msg->req_str[byte_size]='\0';
     if(byte_size>0){
         int ret=sscanf(msg->req_str,"%19s %255s %19s",msg->req->method_str,msg->req->path_str,msg->req->version_str);
-        printf("%s\n",msg->req->path_str);
-        printf("%s\n",msg->req_str);
+        //printf("%s\n",msg->req->path_str);              //temporarily disabled
+        //printf("%s\n",msg->req_str);                  //temporarily disabled
         if(ret==3){
             method_state_init(msg);
         }
@@ -121,7 +121,7 @@ static void error_respond(resp_use_t *res,HTTP_t *msg){
 static void success_respond(resp_use_t *res,char *content,char *res_header,HTTP_t *msg,FILE *res_file){
     size_t n;
     send(res->new_socket,res_header,strlen(res_header),MSG_NOSIGNAL);
-    printf("%s\n",res_header);
+    //printf("%s\n",res_header);                            //temporarily disabled
     while((n=fread(content,sizeof(char),sizeof(content),res_file))>0){
         send(res->new_socket,content,n,MSG_NOSIGNAL);
     }
@@ -151,12 +151,12 @@ void respond_to_client(void *arg){
     else{
         int file_format_index=path_distinguish(msg);
         //int whitelist_index=Whitelist_check(msg);       
-        printf("%d\n",file_format_index);
+        //printf("%d\n",file_format_index);                //temporarily disabled
         if(file_format_index<0 /*|| whitelist_index<1*/){
             error_respond(res,msg);
             return;
         }
-        if(file_format_index==0){
+        if(file_format_index==0){                  // if client msg is "GET/ HTTP1.0 " resend html file as default
             char html_dir[]="./www/index.html";
             FILE *res_file=fopen(html_dir,"r");
             stat(html_dir, &st);
@@ -172,6 +172,10 @@ void respond_to_client(void *arg){
             memset(specific_path,0,256);
             snprintf(specific_path,sizeof(specific_path),"%s%s",general_dir,msg->req->path_str);
             FILE *res_file=fopen(specific_path,"r");
+            if(res_file==NULL){    // when request file is not in /www folder, response error 404
+                error_respond(res,msg);
+                return;
+            }
             stat(specific_path, &st);
             snprintf(res_header,sizeof(res_header)
             ,respond_template

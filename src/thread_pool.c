@@ -26,8 +26,8 @@ typedef struct thread_t
 }thread_t;
 
 
-static const int init_task_capacity=2048;
-static const int init_thread_size=12;
+static const int init_task_capacity=4096;
+static const int init_thread_size=4;
 static thread_pool_t *global_pool = NULL;
 static calthread_t *global_calthread=NULL;
 
@@ -133,7 +133,7 @@ static void *cal(){
                 newthread=(thread_t*)malloc(sizeof(thread_t));
                 newthread->next = NULL;
                 newthread->prev = NULL;
-                newthread->s=IDLE;
+                newthread->s=RUNNING;  //after creating a new thread ,it starts comsuming tasks right away
                 pthread_cond_init(&(newthread->notify), NULL);
                 pthread_attr_t attr;
                 pthread_attr_init(&attr);
@@ -172,7 +172,6 @@ static void *cal(){
                     thread_t *old=global_pool->dummy_head->next;
                     if(old!=NULL){
                         global_pool->dummy_head->next=old->next;
-                        old->next=NULL;
                         if(global_pool->dummy_head->next!=NULL){
                             old->next->prev=global_pool->dummy_head;
                         }

@@ -129,17 +129,19 @@ static void *cal(){
                 global_pool->queue=newqueue;
                 global_pool->task_size *= 2;
                 free(oldqueue);
-                thread_t *newthread;
-                newthread=(thread_t*)malloc(sizeof(thread_t));
-                newthread->next = NULL;
-                newthread->prev = NULL;
-                newthread->s=RUNNING;  //after creating a new thread ,it starts comsuming tasks right away
-                pthread_cond_init(&(newthread->notify), NULL);
-                pthread_attr_t attr;
-                pthread_attr_init(&attr);
-                pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
-                pthread_create(&newthread->thread,&attr,worker,newthread);
-                pthread_attr_destroy(&attr);
+
+                    thread_t *newthread;
+                    newthread=(thread_t*)malloc(sizeof(thread_t));
+                    newthread->next = NULL;
+                    newthread->prev = NULL;
+                    newthread->s=RUNNING;  //after creating a new thread ,it starts comsuming tasks right away
+                    pthread_cond_init(&(newthread->notify), NULL);
+                    pthread_attr_t attr;
+                    pthread_attr_init(&attr);
+                    pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+                    pthread_create(&newthread->thread,&attr,worker,newthread);
+                    pthread_attr_destroy(&attr);
+
                 global_pool->thread_size += 1;
             }
             else if(global_calthread->rate<=0.3){
@@ -234,7 +236,7 @@ static calthread_t *calthread_init(){
 }
 
 thread_pool_t *pool_init(){
-    calthread_t *calthread;
+    //calthread_t *calthread;
     thread_pool_t *pool=NULL; 
     pool=(thread_pool_t*)malloc(sizeof(thread_pool_t));
     pool->dummy_head=(thread_t*)malloc(sizeof(thread_t));
@@ -253,8 +255,8 @@ thread_pool_t *pool_init(){
     pool->thread_size=init_thread_size;
     pool->shutdown=0;
     global_pool=pool;
-    calthread=calthread_init();
-    global_calthread=calthread;
+    //calthread=calthread_init();
+    //global_calthread=calthread;
     for(int i=0;i<init_thread_size;i++){
         thread_t *newnode=thread_init();
         if(pool->dummy_head->next==NULL){
@@ -293,6 +295,7 @@ void pool_destroy(thread_pool_t *pool){
     pthread_mutex_unlock(&pool->lock);
     pthread_cond_destroy(&pool->all_done);
     pthread_mutex_destroy(&pool->lock);
+    free(pool->dummy_head);
     free(pool->queue);
     free(pool);
 }

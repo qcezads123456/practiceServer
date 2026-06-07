@@ -1,5 +1,7 @@
 .vscode/
 test_prog
 config/
-www/
-build/
+www/*
+build/test_prog
+!www/.gitkeep
+whitelist/whitelist.txt

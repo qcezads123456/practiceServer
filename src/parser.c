@@ -112,6 +112,7 @@ static void error_respond(resp_use_t *res,HTTP_t *msg){
     if(msg){
         free(msg->req);
         free(msg);
+        
     }
     shutdown(res->new_socket, SHUT_RDWR);
     close(res->new_socket);
@@ -130,6 +131,7 @@ static void success_respond(resp_use_t *res,char *content,char *res_header,HTTP_
     free(msg);
     shutdown(res->new_socket, SHUT_RDWR);
     close(res->new_socket);
+    free(res);
     return;
 }
 void respond_to_client(void *arg){

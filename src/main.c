@@ -25,6 +25,9 @@ int main(){
         exit(EXIT_FAILURE);
     }
     socklen_t socklen=sizeof(addr);
+    struct timeval timeout;
+    timeout.tv_sec=1;
+    timeout.tv_usec=0;
     whitelist_init();
     while(!stop){
         resp_use_t *client_res;
@@ -32,6 +35,7 @@ int main(){
         client_res->sockfd=res->sockfd;
         client_res->new_socket=accept(res->sockfd,(struct sockaddr*)&addr,&socklen);
         if(client_res->new_socket>=0){
+            setsockopt(client_res->new_socket,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));
             if(client_res->new_socket==0){
                 char *res_msg=
                     "HTTP/1.0 503 Service Unavailable\r\n"
@@ -63,7 +67,7 @@ int main(){
                 free(client_res);
                 continue;
             }
-            perror("accept :");
+            perror("accept");
             break;
         }
 

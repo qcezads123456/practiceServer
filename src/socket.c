@@ -9,6 +9,7 @@ struct sockaddr_in addr_init(){
 }
 
 bool network_init(int *fd,struct sockaddr_in *addr){
+    int ret;
     *fd=socket(AF_INET,SOCK_STREAM,0); //init IPV4 and TCP connection
     if(*fd==-1){
         perror("socket initialize error");
@@ -24,6 +25,7 @@ bool network_init(int *fd,struct sockaddr_in *addr){
         perror("listen fail");
         return 0;
     }
+
     return 1;
 }
 

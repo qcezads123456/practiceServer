@@ -20,6 +20,7 @@ static const char *file_format[]={
     ".woff2", "font/woff2"
 };
 static const char error_meg[]="HTTP/1.0 404 Not Found\r\n\r\n";
+static const char timeout_error_meg[]="HTTP/1.0 408 Request Timeout\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
 static const size_t file_format_size=sizeof(file_format)/sizeof(file_format[0]);
 typedef enum{
     GET,
@@ -52,7 +53,17 @@ void method_state_init(HTTP_t *msg){
     }
 }
 static int parse(int new_socket,HTTP_t *msg){
-    size_t byte_size=read(new_socket,msg->req_str,sizeof(msg->req_str));
+    ssize_t byte_size=read(new_socket,msg->req_str,sizeof(msg->req_str)-1);
+    if (byte_size < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            perror("\ntimeout");
+            return -2;
+        }
+        else{
+            perror("\nread");
+            return -1;
+        }      
+    }
     msg->req_str[byte_size]='\0';
     if(byte_size>0){
         int ret=sscanf(msg->req_str,"%19s %255s %19s",msg->req->method_str,msg->req->path_str,msg->req->version_str);
@@ -89,17 +100,25 @@ static int path_distinguish(HTTP_t *msg){
     return -1; // fail
 }
 static int Whitelist_check(HTTP_t *msg){
-    char list_path[]="./www/list.txt";
+    if(strstr(msg->req->path_str,"..")!=NULL){
+        printf("invalid path\n");
+        return -1;
+    }
+    char list_path[]="./whitelist/whitelist.txt";
     struct stat f_st;
     FILE *Flist=fopen(list_path,"r");
     stat(list_path, &f_st);
     char list_content[f_st.st_size+1];
     memset(list_content,0,f_st.st_size+1);
-    fread(list_content,sizeof(char),f_st.st_size,Flist);
+    size_t nread=fread(list_content,sizeof(char),f_st.st_size,Flist);
+    if(nread!=(size_t)f_st.st_size){
+        return -1;
+    }
     char *result=strstr(list_content,msg->req->path_str);
     int return_index;
     if(result==NULL){
         return_index=-1;
+        printf("invalid path\n");
     }
     else{
         return_index=1;
@@ -107,8 +126,22 @@ static int Whitelist_check(HTTP_t *msg){
     fclose(Flist);
     return return_index;
 }
+static void timeout_respond(resp_use_t *res,HTTP_t *msg){
+    send(res->new_socket,timeout_error_meg,strlen(timeout_error_meg),MSG_NOSIGNAL);
+    printf("%s\n",timeout_error_meg);   
+    if(msg){
+        free(msg->req);
+        free(msg);
+        
+    }
+    shutdown(res->new_socket, SHUT_RDWR);
+    close(res->new_socket);
+    free(res);
+    return;
+}
 static void error_respond(resp_use_t *res,HTTP_t *msg){
     send(res->new_socket,error_meg,strlen(error_meg),MSG_NOSIGNAL);
+    printf("%s\n",error_meg);   
     if(msg){
         free(msg->req);
         free(msg);
@@ -122,7 +155,7 @@ static void error_respond(resp_use_t *res,HTTP_t *msg){
 static void success_respond(resp_use_t *res,char *content,char *res_header,HTTP_t *msg,FILE *res_file){
     size_t n;
     send(res->new_socket,res_header,strlen(res_header),MSG_NOSIGNAL);
-    //printf("%s\n",res_header);                            //temporarily disabled
+    printf("%s\n",res_header);                            //temporarily disabled
     while((n=fread(content,sizeof(char),sizeof(content),res_file))>0){
         send(res->new_socket,content,n,MSG_NOSIGNAL);
     }
@@ -146,15 +179,22 @@ void respond_to_client(void *arg){
     memset(res_header,0,4096);
     struct stat st;
     memset(msg->req_str,0,sizeof(msg->req_str));
-    if(parse(res->new_socket,msg)<1){
-        error_respond(res,msg);
+    int ret;
+    ret=parse(res->new_socket,msg);
+    if(ret<1){
+        if(ret==-2){
+            timeout_respond(res,msg);
+        }
+        else{
+            error_respond(res,msg);
+        }
         return;
     }
     else{
         int file_format_index=path_distinguish(msg);
-        //int whitelist_index=Whitelist_check(msg);       
+        int whitelist_index=Whitelist_check(msg);       
         //printf("%d\n",file_format_index);                //temporarily disabled
-        if(file_format_index<0 /*|| whitelist_index<1*/){
+        if(file_format_index<0 || whitelist_index<1){
             error_respond(res,msg);
             return;
         }
